@@ -2,8 +2,9 @@ import numpy as np
 import pyvista as pv
 import laspy
 import os
-from tkinter import Tk, filedialog, Button, Label
+from tkinter import Tk, filedialog, Button, Label, messagebox
 import pyperclip
+import sys
 
 def load_las_file(file_path):
     try:
@@ -24,7 +25,7 @@ def load_las_file(file_path):
             colors = np.vstack((las_file.red, las_file.green, las_file.blue)).transpose()
             colors = (colors) / 255.0
             colors = np.clip(colors, 0, 255)
-            point_cloud['Colors'] = colors / 255.0  # Normalize to [0, 1]
+            point_cloud['Colors'] = colors
             return point_cloud, True
         else:
             point_cloud['Elevation'] = points[:, 2]
@@ -46,6 +47,12 @@ def load_las_files_from_folder(folder_path):
 
 class LASViewer:
     def __init__(self):
+        self.line_actor = None
+        self.label_actors = []
+        self.selected_points = []
+        self.initialize_viewer()
+
+    def initialize_viewer(self):
         self.folder_path = select_folder()
         self.las_data = load_las_files_from_folder(self.folder_path)
 
@@ -66,7 +73,11 @@ class LASViewer:
         self.plotter.add_key_event("Left", self.previous_las_file)
         self.plotter.add_key_event("d", self.copy_detection_id)
         self.plotter.add_key_event("c", self.copy_coordinates)
+        self.plotter.add_key_event("r", self.confirm_reset_program)
+        self.plotter.add_key_event("l", self.confirm_close_program)
 
+        # Enable point picking
+        self.plotter.enable_point_picking(callback=self.handle_point_pick)
         self.update_plot()
         self.plotter.show()
 
@@ -79,14 +90,27 @@ class LASViewer:
                                   show_scalar_bar=False, render_points_as_spheres=True)
         else:
             self.plotter.add_mesh(point_cloud, scalars='Elevation', point_size=5, 
-                                  cmap='terrain', show_scalar_bar=True, render_points_as_spheres=True)
+                                  cmap='terrain', show_scalar_bar=False, render_points_as_spheres=True)
 
         self.plotter.add_axes()
         self.plotter.reset_camera()
-        self.plotter.camera_position = 'xy'  
+        self.plotter.camera_position = 'xy'
         self.plotter.render()
 
         self.label.config(text=f"File: {os.path.basename(file_name)}")
+
+    def handle_point_pick(self, point):
+        self.selected_points.append(point)
+        print(f"Selected point: {point}")
+        
+        # Once two points are picked, calculate the z-distance
+        if len(self.selected_points) == 2:
+            z_distance = abs(self.selected_points[0][2] - self.selected_points[1][2])
+            print(f"Z-distance between points: {round(z_distance, 3)}")
+            messagebox.showinfo("Z-Distance", f"Z-distance between points: {round(z_distance, 3)}")
+            
+            # Reset the selected points after calculation
+            self.selected_points.clear()
 
     def copy_detection_id(self):
         file_name = self.las_data[self.current_index][0]
@@ -109,14 +133,48 @@ class LASViewer:
         pyperclip.copy(coordinates)
 
     def next_las_file(self):
-        if self.current_index < len(self.las_data) - 1:  # Prevent going past last file
+        if self.current_index < len(self.las_data) - 1:
             self.current_index += 1
             self.update_plot()
 
     def previous_las_file(self):
-        if self.current_index > 0:  # Prevent going before the first file
+        if self.current_index > 0:
             self.current_index -= 1
             self.update_plot()
 
-if __name__ == "__main__":
-    LASViewer()
+    def confirm_reset_program(self):
+        confirm = messagebox.askyesno("Reset Program", "Are you sure you want to reset and load new LAS files?")
+        if confirm:
+            self.restart_program()  
+    
+    def restart_program(self):
+        self.plotter.close()
+        self.initialize_viewer()
+
+    def confirm_close_program(self):
+        confirm = messagebox.askyesno("Quit Program", "Are you sure you want to quit?")
+        if confirm:
+            self.close_program()
+
+    def close_program(self):
+        """Closes the plotter and exits the program."""
+        self.plotter.close()
+        sys.exit()
+
+def start_program():
+    """Function to start the LASViewer program."""
+    start_menu.destroy()  # Close the start menu window
+    LASViewer()  # Start the main LASViewer program
+
+# Create the Start Menu
+start_menu = Tk()
+start_menu.geometry('300x100')
+start_menu.title("Start Menu")
+
+# Create a button that starts the program
+start_button = Button(start_menu, text="Start LAS Viewer", command=start_program, 
+                      padx=20, pady=10, font=("Helvetica", 14))
+start_button.pack(pady=20)
+
+# Run the start menu's event loop
+start_menu.mainloop()
