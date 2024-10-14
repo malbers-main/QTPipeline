@@ -15,7 +15,6 @@ from pyvistaqt import QtInteractor  # Ensure you have pyvistaqt installed
 
 scaling_factor = 1  # Adjusted to 100,000
 
-
 def load_las_file(file_path):
     try:
         las_file = laspy.read(file_path)
@@ -60,9 +59,6 @@ class LASViewer(QWidget):
 
         self.layout = QVBoxLayout()
         self.setLayout(self.layout)
-
-        # Set dark mode
-        self.set_dark_mode()
 
         # Top layout for buttons and label
         top_layout = QHBoxLayout()
@@ -111,31 +107,6 @@ class LASViewer(QWidget):
         # Load LAS files
         self.select_folder_and_load()
 
-    def set_dark_mode(self):
-        dark_qss = """
-        QWidget {
-            background-color: #121212;
-            color: #ffffff;
-        }
-        QPushButton {
-            background-color: #1e1e1e;
-            color: #ffffff;
-            border: 1px solid #3d3d3d;
-            padding: 5px;
-        }
-        QPushButton:hover {
-            background-color: #373737;
-        }
-        QLabel {
-            color: #ffffff;
-        }
-        QMessageBox QLabel {
-            color: #ffffff;
-        }
-        """
-        self.setStyleSheet(dark_qss)
-
-
     def select_folder_and_load(self):
         folder = QFileDialog.getExistingDirectory(self, "Select Folder Containing LAS Files")
         if not folder:
@@ -154,9 +125,6 @@ class LASViewer(QWidget):
     def update_plot(self):
         # Clear the plot before loading the new point cloud
         self.plotter.clear()
-
-        # Set the background color to black (or dark gray)
-        self.plotter.set_background('black')  # You can also use '#2e2e2e' for dark gray
 
         # Get the current LAS file's point cloud and RGB status
         file_name, (point_cloud, has_rgb) = self.las_data[self.current_index]
@@ -268,4 +236,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
