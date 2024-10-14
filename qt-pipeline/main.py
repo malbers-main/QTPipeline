@@ -13,7 +13,8 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt
 from pyvistaqt import QtInteractor  # Ensure you have pyvistaqt installed
 
-scaling_factor = 100000  # Adjusted to 100,000
+scaling_factor = 1  # Adjusted to 100,000
+
 
 def load_las_file(file_path):
     try:
@@ -102,7 +103,7 @@ class LASViewer(QWidget):
         self.plotter.add_key_event("c", self.copy_coordinates)
         self.plotter.add_key_event("r", self.confirm_reset_program)
         self.plotter.add_key_event("l", self.confirm_close_program)
-        self.plotter.add_key_event("p", self.pick_point_under_mouse)  # Use 'p' key to pick points
+        self.plotter.add_key_event("p", self.handle_point_pick)  # Add key for toggling point-picking mode
 
         # Load LAS files
         self.select_folder_and_load()
@@ -132,10 +133,10 @@ class LASViewer(QWidget):
         # Plot the point cloud based on whether it has RGB colors or elevation data
         if has_rgb:
             self.plotter.add_mesh(point_cloud, scalars='Colors', rgb=True, point_size=5,
-                                  show_scalar_bar=False, render_points_as_spheres=True)
+                                  show_scalar_bar=False, render_points_as_spheres=True, pickable=True)
         else:
             self.plotter.add_mesh(point_cloud, scalars='Elevation', point_size=5,
-                                  cmap='terrain', show_scalar_bar=False, render_points_as_spheres=True)
+                                  cmap='terrain', show_scalar_bar=False, render_points_as_spheres=True, pickable=True)
 
         # Add axes and reset the camera for a good view
         self.plotter.add_axes()
@@ -145,22 +146,6 @@ class LASViewer(QWidget):
 
         # Update the label to show the current file's name
         self.label.setText(f"File: {os.path.basename(file_name)}")
-
-    def pick_point_under_mouse(self):
-        picked_point = self.plotter.pick_mouse_position()
-        if picked_point is not None:
-            self.handle_point_pick(picked_point, self.plotter)
-
-    def handle_point_pick(self, picked_point, plotter):
-        if picked_point is not None:
-            self.selected_points.append(picked_point)
-            print(f"Selected point: {picked_point}")
-
-            if len(self.selected_points) == 2:
-                z_distance = round(abs(scaling_factor * (self.selected_points[0][2] - self.selected_points[1][2])))
-                print(f"Z-distance between points: {z_distance}")
-                QMessageBox.information(self, "Z-Distance", f"Z-distance between points: {z_distance}")
-                self.selected_points.clear()
 
     def copy_detection_id(self):
         file_name = self.las_data[self.current_index][0]
