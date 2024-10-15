@@ -4,7 +4,6 @@ import numpy as np
 import laspy
 import pyperclip
 import pyvista as pv
-from vtkmodules.vtkInteractionStyle import vtkInteractorStyleTrackballCamera
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QPushButton, QLabel, QFileDialog,
     QMessageBox, QHBoxLayout
@@ -12,9 +11,18 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt
 from pyvistaqt import QtInteractor  # Ensure you have pyvistaqt installed
 
-scaling_factor = 100000  # Adjusted to 100,000
+scaling_factor = 100000  # Scaling factor to adjust Z values for visualization
 
 def load_las_file(file_path):
+    """
+    Load a .las file and extract its point cloud data.
+
+    Args:
+        file_path (str): Path to the .las file.
+    
+    Returns:
+        tuple: A PyVista PolyData object and a boolean indicating if RGB colors are available.
+    """
     try:
         las_file = laspy.read(file_path)
         points = np.vstack((
@@ -26,13 +34,14 @@ def load_las_file(file_path):
         if points.size == 0:
             raise ValueError("No points found in the LAS file.")
 
-        points[:, 2] = points[:, 2] / scaling_factor
+        # Scale Z axis to match visualization requirements
+        points[:, 2] /= scaling_factor
         point_cloud = pv.PolyData(points)
 
+        # Check if RGB color data is available and add it
         if hasattr(las_file, 'red') and hasattr(las_file, 'green') and hasattr(las_file, 'blue'):
             colors = np.vstack((las_file.red, las_file.green, las_file.blue)).transpose()
-            colors = (colors) / 255.0
-            colors = np.clip(colors, 0, 255)
+            colors = colors / 255.0  # Normalize to range [0, 1]
             point_cloud['Colors'] = colors
             return point_cloud, True
         else:
@@ -45,19 +54,32 @@ def load_las_file(file_path):
 
 
 def load_las_files_from_folder(folder_path):
+    """
+    Load all .las files from a specified folder.
+
+    Args:
+        folder_path (str): Path to the folder containing .las files.
+    
+    Returns:
+        list: A list of tuples containing the file name and its corresponding PolyData.
+    """
     las_files = [os.path.join(folder_path, f) for f in os.listdir(folder_path) if f.endswith('.las')]
-    data = [(file, load_las_file(file)) for file in las_files]
-    return [d for d in data if d[1][0] is not None]
+    return [(file, load_las_file(file)) for file in las_files if load_las_file(file)[0] is not None]
+
 
 class CustomQtInteractor(QtInteractor):
+    """
+    Custom PyVista interactor to disable right-click events.
+    """
     def mousePressEvent(self, event):
-        # Ignore right-clicks (Qt.RightButton)
-        if event.button() == Qt.RightButton:
-            return
-        # Pass other events to the parent class (QtInteractor)
-        super().mousePressEvent(event)
+        if event.button() != Qt.RightButton:
+            super().mousePressEvent(event)
+
 
 class LASViewer(QWidget):
+    """
+    Main viewer for displaying and interacting with LAS files.
+    """
     def __init__(self):
         super().__init__()
         self.setWindowTitle("LAS Viewer")
@@ -66,7 +88,7 @@ class LASViewer(QWidget):
         self.layout = QVBoxLayout()
         self.setLayout(self.layout)
 
-        # Set dark mode
+        # Set dark mode for the UI
         self.set_dark_mode()
 
         # Top layout for buttons and label
@@ -97,7 +119,6 @@ class LASViewer(QWidget):
         self.point_selection_button = QPushButton("Enter Point Selection Mode")
         self.point_selection_button.clicked.connect(self.toggle_point_picking)
         top_layout.addWidget(self.point_selection_button)
-        
 
         # Use the custom interactor to disable right-click
         self.plotter = CustomQtInteractor(self)
@@ -107,11 +128,11 @@ class LASViewer(QWidget):
         self.folder_path = ''
         self.las_data = []
         self.current_index = 0
-        self.selected_points = []  # List to store selected points
+        self.selected_points = []  # Store selected points for distance calculations
         self.last_drawn_line = None  # Store the last drawn line
-        self.point_picking_enabled = False  # Track whether point picking is enabled or disabled
+        self.point_picking_enabled = False  # Track whether point picking is enabled
 
-        # Key event handling using add_key_event
+        # Key event handling
         self.plotter.add_key_event("Right", self.next_las_file)
         self.plotter.add_key_event("Left", self.previous_las_file)
         self.plotter.add_key_event("d", self.copy_detection_id)
@@ -124,72 +145,53 @@ class LASViewer(QWidget):
         self.select_folder_and_load()
     
     def toggle_point_picking(self):
-        # Check if point picking is currently enabled
+        """
+        Toggle point picking mode to allow users to select points for distance measurement.
+        """
         if self.point_picking_enabled:
-            # Disable point picking
             self.plotter.disable_picking()
             self.point_picking_enabled = False
-            
             if self.last_drawn_line:
                 self.plotter.remove_actor(self.last_drawn_line)
             self.selected_points.clear()
-            self.plotter.render()
-
         else:
-            # Enable point picking
             self.plotter.enable_point_picking(
-                callback=self.on_point_picked,  # Callback function for point picking
+                callback=self.on_point_picked,
                 tolerance=0.025,
                 show_message="POINT SELECTION MODE ACTIVATED",
                 font_size=12,
                 color='purple',
                 point_size=20,
                 show_point=True,
-                use_picker=False,
-                pickable_window=False,
-                clear_on_no_selection=True,
             )
             self.point_picking_enabled = True
-            # Remove any previously drawn lines and points
-            if self.last_drawn_line:
-                self.plotter.remove_actor(self.last_drawn_line)
-            self.selected_points.clear()
-            self.plotter.render()
-        
+        self.plotter.render()
+
     def on_point_picked(self, picked_point, picker=None):
-        # Append the picked point's coordinates to the list of selected points
+        """
+        Handle point selection for distance measurement. When two points are picked,
+        the Z-distance between them is calculated and displayed.
+        """
         self.selected_points.append(picked_point)
 
-        # Check if two points have been picked
         if len(self.selected_points) == 2:
-            # Extract the coordinates of the two selected points
-            point1 = self.selected_points[0]
-            point2 = self.selected_points[1]
-
-            # Calculate the Z-distance between the two points
-            z_distance = round(abs(scaling_factor*(point2[2] - point1[2])), 3)
-
-            # Print the Z-distance to the user
-            print(f"Z-distance between selected points: {z_distance:.6f}")
-
-            # Optionally, display the distance in the Qt GUI or a message box
+            point1, point2 = self.selected_points
+            z_distance = round(abs(scaling_factor * (point2[2] - point1[2])), 3)
             QMessageBox.information(self, "Z-Distance", f"Z-distance: {z_distance:.1f}")
 
-            # Remove any previously drawn line
             if self.last_drawn_line:
                 self.plotter.remove_actor(self.last_drawn_line)
 
-            # Create a new line between the two points
             line = pv.Line(point1, point2)
             self.last_drawn_line = self.plotter.add_mesh(line, color='red', line_width=3, pickable=False)
-
-            # Render the plot to update the visual
             self.plotter.render()
 
-            # Reset the list of selected points for the next selection
             self.selected_points.clear()
 
     def set_dark_mode(self):
+        """
+        Apply dark mode styling to the PyQt5 interface.
+        """
         dark_qss = """
         QWidget {
             background-color: #121212;
@@ -214,10 +216,14 @@ class LASViewer(QWidget):
         self.setStyleSheet(dark_qss)
 
     def select_folder_and_load(self):
+        """
+        Open a folder dialog to select a folder containing LAS files.
+        """
         folder = QFileDialog.getExistingDirectory(self, "Select Folder Containing LAS Files")
         if not folder:
             QMessageBox.warning(self, "No Folder Selected", "Please select a folder to proceed.")
             sys.exit()
+
         self.folder_path = folder
         self.las_data = load_las_files_from_folder(self.folder_path)
 
@@ -229,16 +235,14 @@ class LASViewer(QWidget):
         self.update_plot()
 
     def update_plot(self):
-        # Clear the plot before loading the new point cloud
+        """
+        Update the visual plot with the current LAS file's data.
+        """
         self.plotter.clear()
+        self.plotter.set_background('#2e2e2e')
 
-        # Set the background color to black (or dark gray)
-        self.plotter.set_background('#2e2e2e')  # You can also use '#2e2e2e' for dark gray
-
-        # Get the current LAS file's point cloud and RGB status
         file_name, (point_cloud, has_rgb) = self.las_data[self.current_index]
 
-        # Plot the point cloud based on whether it has RGB colors or elevation data
         if has_rgb:
             self.plotter.add_mesh(point_cloud, scalars='Colors', rgb=True, point_size=5,
                                   show_scalar_bar=False, render_points_as_spheres=True, pickable=True)
@@ -246,33 +250,35 @@ class LASViewer(QWidget):
             self.plotter.add_mesh(point_cloud, scalars='Elevation', point_size=5,
                                   cmap='terrain', show_scalar_bar=False, render_points_as_spheres=True, pickable=True)
 
-        # Add axes and reset the camera for a good view
         self.plotter.add_axes()
         self.plotter.reset_camera()
         self.plotter.camera_position = 'xy'
         self.plotter.render()
 
-        # Update the label to show the current file's name
         self.label.setText(f"File: {os.path.basename(file_name)}")
 
     def copy_detection_id(self):
+        """
+        Copy the detection ID (extracted from the file name) to the clipboard.
+        """
         file_name = self.las_data[self.current_index][0]
-        base_name = os.path.basename(file_name)
-
         try:
-            detection_id = base_name.split("Detection_")[1].split(".las")[0]
+            detection_id = file_name.split("Detection_")[1].split(".las")[0]
             pyperclip.copy(detection_id)
             QMessageBox.information(self, "Copied", f"Detection ID '{detection_id}' copied to clipboard.")
         except IndexError:
             QMessageBox.warning(self, "Error", "Could not extract Detection ID from the file name.")
 
     def copy_coordinates(self):
+        """
+        Copy the central coordinates (latitude and longitude) of the current point cloud to the clipboard.
+        """
         _, (point_cloud, _) = self.las_data[self.current_index]
         points = point_cloud.points
 
         if points.size > 0:
-            central_lat = np.mean(points[:, 1])  # Latitude (Y)
-            central_lon = np.mean(points[:, 0])  # Longitude (X)
+            central_lat = np.mean(points[:, 1])
+            central_lon = np.mean(points[:, 0])
             coordinates = f"{central_lat:.6f}, {central_lon:.6f}"
         else:
             coordinates = "No points available."
@@ -281,6 +287,9 @@ class LASViewer(QWidget):
         QMessageBox.information(self, "Copied", f"Coordinates '{coordinates}' copied to clipboard.")
 
     def next_las_file(self):
+        """
+        Move to the next LAS file in the folder.
+        """
         if self.current_index < len(self.las_data) - 1:
             self.current_index += 1
             self.update_plot()
@@ -288,6 +297,9 @@ class LASViewer(QWidget):
             QMessageBox.information(self, "End", "This is the last LAS file.")
 
     def previous_las_file(self):
+        """
+        Move to the previous LAS file in the folder.
+        """
         if self.current_index > 0:
             self.current_index -= 1
             self.update_plot()
@@ -295,6 +307,9 @@ class LASViewer(QWidget):
             QMessageBox.information(self, "Start", "This is the first LAS file.")
 
     def confirm_reset_program(self):
+        """
+        Confirm and reset the program, allowing the user to select a new folder of LAS files.
+        """
         reply = QMessageBox.question(self, 'Reset Program',
                                      "Are you sure you want to reset and load new LAS files?",
                                      QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
@@ -302,6 +317,9 @@ class LASViewer(QWidget):
             self.select_folder_and_load()
 
     def confirm_close_program(self):
+        """
+        Confirm and close the program.
+        """
         reply = QMessageBox.question(self, 'Quit Program',
                                      "Are you sure you want to quit?",
                                      QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
@@ -309,11 +327,17 @@ class LASViewer(QWidget):
             self.close()
 
     def closeEvent(self, event):
+        """
+        Handle the closing event and clean up the plotter.
+        """
         self.plotter.close()
         event.accept()
 
 
 class StartMenu(QWidget):
+    """
+    Start menu to launch the LAS Viewer.
+    """
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Start Menu")
@@ -331,6 +355,9 @@ class StartMenu(QWidget):
         self.layout.addStretch()
 
     def start_program(self):
+        """
+        Launch the LAS Viewer and close the start menu.
+        """
         self.viewer = LASViewer()
         self.viewer.show()
         self.close()
@@ -345,4 +372,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
