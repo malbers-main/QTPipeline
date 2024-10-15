@@ -4,17 +4,15 @@ import numpy as np
 import laspy
 import pyperclip
 import pyvista as pv
-
+from vtkmodules.vtkInteractionStyle import vtkInteractorStyleTrackballCamera
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QPushButton, QLabel, QFileDialog,
     QMessageBox, QHBoxLayout
 )
-
 from PyQt5.QtCore import Qt
 from pyvistaqt import QtInteractor  # Ensure you have pyvistaqt installed
 
-scaling_factor = 1  # Adjusted to 100,000
-
+scaling_factor = 100000  # Adjusted to 100,000
 
 def load_las_file(file_path):
     try:
@@ -51,6 +49,13 @@ def load_las_files_from_folder(folder_path):
     data = [(file, load_las_file(file)) for file in las_files]
     return [d for d in data if d[1][0] is not None]
 
+class CustomQtInteractor(QtInteractor):
+    def mousePressEvent(self, event):
+        # Ignore right-clicks (Qt.RightButton)
+        if event.button() == Qt.RightButton:
+            return
+        # Pass other events to the parent class (QtInteractor)
+        super().mousePressEvent(event)
 
 class LASViewer(QWidget):
     def __init__(self):
@@ -88,16 +93,23 @@ class LASViewer(QWidget):
         self.copy_coords_button = QPushButton("Copy Coordinates")
         self.copy_coords_button.clicked.connect(self.copy_coordinates)
         top_layout.addWidget(self.copy_coords_button)
+        
+        self.point_selection_button = QPushButton("Enter Point Selection Mode")
+        self.point_selection_button.clicked.connect(self.toggle_point_picking)
+        top_layout.addWidget(self.point_selection_button)
+        
 
-        # PyVista QtInteractor
-        self.plotter = QtInteractor(self)
+        # Use the custom interactor to disable right-click
+        self.plotter = CustomQtInteractor(self)
         self.layout.addWidget(self.plotter.interactor)
 
         # Initialize variables
         self.folder_path = ''
         self.las_data = []
         self.current_index = 0
-        self.selected_points = []
+        self.selected_points = []  # List to store selected points
+        self.last_drawn_line = None  # Store the last drawn line
+        self.point_picking_enabled = False  # Track whether point picking is enabled or disabled
 
         # Key event handling using add_key_event
         self.plotter.add_key_event("Right", self.next_las_file)
@@ -106,10 +118,76 @@ class LASViewer(QWidget):
         self.plotter.add_key_event("c", self.copy_coordinates)
         self.plotter.add_key_event("r", self.confirm_reset_program)
         self.plotter.add_key_event("l", self.confirm_close_program)
-        self.plotter.add_key_event("p", self.handle_point_pick)  # Add key for toggling point-picking mode
+        self.plotter.add_key_event("z", self.toggle_point_picking)
 
         # Load LAS files
         self.select_folder_and_load()
+    
+    def toggle_point_picking(self):
+        # Check if point picking is currently enabled
+        if self.point_picking_enabled:
+            # Disable point picking
+            self.plotter.disable_picking()
+            self.point_picking_enabled = False
+            
+            if self.last_drawn_line:
+                self.plotter.remove_actor(self.last_drawn_line)
+            self.selected_points.clear()
+            self.plotter.render()
+
+        else:
+            # Enable point picking
+            self.plotter.enable_point_picking(
+                callback=self.on_point_picked,  # Callback function for point picking
+                tolerance=0.025,
+                show_message="POINT SELECTION MODE ACTIVATED",
+                font_size=12,
+                color='purple',
+                point_size=20,
+                show_point=True,
+                use_picker=False,
+                pickable_window=False,
+                clear_on_no_selection=True,
+            )
+            self.point_picking_enabled = True
+            # Remove any previously drawn lines and points
+            if self.last_drawn_line:
+                self.plotter.remove_actor(self.last_drawn_line)
+            self.selected_points.clear()
+            self.plotter.render()
+        
+    def on_point_picked(self, picked_point, picker=None):
+        # Append the picked point's coordinates to the list of selected points
+        self.selected_points.append(picked_point)
+
+        # Check if two points have been picked
+        if len(self.selected_points) == 2:
+            # Extract the coordinates of the two selected points
+            point1 = self.selected_points[0]
+            point2 = self.selected_points[1]
+
+            # Calculate the Z-distance between the two points
+            z_distance = round(abs(scaling_factor*(point2[2] - point1[2])), 3)
+
+            # Print the Z-distance to the user
+            print(f"Z-distance between selected points: {z_distance:.6f}")
+
+            # Optionally, display the distance in the Qt GUI or a message box
+            QMessageBox.information(self, "Z-Distance", f"Z-distance: {z_distance:.1f}")
+
+            # Remove any previously drawn line
+            if self.last_drawn_line:
+                self.plotter.remove_actor(self.last_drawn_line)
+
+            # Create a new line between the two points
+            line = pv.Line(point1, point2)
+            self.last_drawn_line = self.plotter.add_mesh(line, color='red', line_width=3, pickable=False)
+
+            # Render the plot to update the visual
+            self.plotter.render()
+
+            # Reset the list of selected points for the next selection
+            self.selected_points.clear()
 
     def set_dark_mode(self):
         dark_qss = """
@@ -135,7 +213,6 @@ class LASViewer(QWidget):
         """
         self.setStyleSheet(dark_qss)
 
-
     def select_folder_and_load(self):
         folder = QFileDialog.getExistingDirectory(self, "Select Folder Containing LAS Files")
         if not folder:
@@ -156,7 +233,7 @@ class LASViewer(QWidget):
         self.plotter.clear()
 
         # Set the background color to black (or dark gray)
-        self.plotter.set_background('black')  # You can also use '#2e2e2e' for dark gray
+        self.plotter.set_background('#2e2e2e')  # You can also use '#2e2e2e' for dark gray
 
         # Get the current LAS file's point cloud and RGB status
         file_name, (point_cloud, has_rgb) = self.las_data[self.current_index]
