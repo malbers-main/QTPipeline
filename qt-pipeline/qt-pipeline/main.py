@@ -7,7 +7,7 @@ import pyvista as pv
 
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QPushButton, QLabel, QFileDialog,
-    QMessageBox, QHBoxLayout
+    QMessageBox, QHBoxLayout, QListWidget
 )
 
 from PyQt5.QtCore import Qt
@@ -89,9 +89,29 @@ class LASViewer(QWidget):
         self.copy_coords_button.clicked.connect(self.copy_coordinates)
         top_layout.addWidget(self.copy_coords_button)
 
+        # Create a horizontal layout for the file list and the plotter
+        side_layout = QHBoxLayout()
+        self.layout.addLayout(side_layout)
+
+        # Add a QListWidget to display LAS files
+        self.las_file_list = QListWidget()
+        self.las_file_list.setFixedWidth(250)  # Set the fixed width for the list
+        self.las_file_list.setStyleSheet("""
+            QListWidget {
+                background-color: #1e1e1e;  /* Dark background for the list */
+                color: #ffffff;              /* White text color */
+            }
+            QListWidget::item:selected {
+                background-color: blue;      /* Blue background for selected item */
+                color: #ffffff;              /* White text color for selected item */
+            }
+        """)  # Set the highlight color to blue
+        self.las_file_list.itemClicked.connect(self.load_selected_file)  # Connect the click signal
+        side_layout.addWidget(self.las_file_list)
+
         # PyVista QtInteractor
         self.plotter = QtInteractor(self)
-        self.layout.addWidget(self.plotter.interactor)
+        side_layout.addWidget(self.plotter.interactor)
 
         # Initialize variables
         self.folder_path = ''
@@ -106,8 +126,9 @@ class LASViewer(QWidget):
         self.plotter.add_key_event("c", self.copy_coordinates)
         self.plotter.add_key_event("r", self.confirm_reset_program)
         self.plotter.add_key_event("l", self.confirm_close_program)
-        self.plotter.add_key_event("p", self.handle_point_pick)  # Add key for toggling point-picking mode
+        self.plotter.add_key_event("n", self.axis_reset)
 
+        
         # Load LAS files
         self.select_folder_and_load()
 
@@ -135,6 +156,12 @@ class LASViewer(QWidget):
         """
         self.setStyleSheet(dark_qss)
 
+    def load_selected_file(self, item):
+        # Get the index of the selected item
+        index = self.las_file_list.row(item)
+        if index != self.current_index:  # Check if the selected index is different
+            self.current_index = index  # Update the current index
+            self.update_plot()  # Update the plot with the selected file
 
     def select_folder_and_load(self):
         folder = QFileDialog.getExistingDirectory(self, "Select Folder Containing LAS Files")
@@ -147,6 +174,11 @@ class LASViewer(QWidget):
         if not self.las_data:
             QMessageBox.critical(self, "No LAS Files", "No valid LAS files found in the selected folder.")
             sys.exit()
+
+        # Clear and populate the QListWidget with LAS file names
+        self.las_file_list.clear()
+        for file_name, _ in self.las_data:
+            self.las_file_list.addItem(os.path.basename(file_name))
 
         self.current_index = 0
         self.update_plot()
@@ -177,6 +209,9 @@ class LASViewer(QWidget):
 
         # Update the label to show the current file's name
         self.label.setText(f"File: {os.path.basename(file_name)}")
+
+        # Highlight the current LAS file in the list
+        self.las_file_list.setCurrentRow(self.current_index)
 
     def copy_detection_id(self):
         file_name = self.las_data[self.current_index][0]
@@ -230,6 +265,9 @@ class LASViewer(QWidget):
                                      QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if reply == QMessageBox.Yes:
             self.close()
+
+    def axis_reset(self):
+        self.plotter.camera_position = 'xy'
 
     def closeEvent(self, event):
         self.plotter.close()
