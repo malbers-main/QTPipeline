@@ -273,7 +273,7 @@ class LASViewer(QWidget):
         if points.size > 0:
             central_lat = np.mean(points[:, 1])  # Latitude (Y)
             central_lon = np.mean(points[:, 0])  # Longitude (X)
-            coordinates = f"{central_lat}, {central_lon}"
+            coordinates = f"{central_lat:.6f}, {central_lon:.6f}"
         else:
             coordinates = "No points available."
 
