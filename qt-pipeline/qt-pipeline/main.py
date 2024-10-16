@@ -72,7 +72,7 @@ def load_las_files_from_folder(folder_path):
         list: A list of tuples containing the file name and its corresponding PolyData.
     """
     las_files = [os.path.join(folder_path, f) for f in os.listdir(folder_path) if f.endswith('.las')]
-    return [(file, load_las_file(file)) for file in las_files if load_las_file(file)[0] is not None]
+    return [(file, result) for file in las_files if (result := load_las_file(file))[0] is not None]
 
 
 class CustomQtInteractor(QtInteractor):
@@ -82,6 +82,7 @@ class CustomQtInteractor(QtInteractor):
     def mousePressEvent(self, event):
         if event.button() != Qt.RightButton:
             super().mousePressEvent(event)
+
 
 class LASViewer(QWidget):
     def __init__(self):
@@ -139,10 +140,6 @@ class LASViewer(QWidget):
         self.las_file_list.itemClicked.connect(self.load_selected_file)
         self.layout.addWidget(self.las_file_list, 1, 0)
 
-        # PyVista QtInteractor in the second column (right)
-        self.plotter = QtInteractor(self)
-        self.layout.addWidget(self.plotter.interactor, 1, 1)
-
         # Use the custom interactor to disable right-click
         self.plotter = CustomQtInteractor(self)
         self.layout.addWidget(self.plotter.interactor, 1, 1)
@@ -186,6 +183,7 @@ class LASViewer(QWidget):
         if len(self.selected_points) == 2:
             point1, point2 = self.selected_points
             z_distance = round(abs(scaling_factor * (point2[2] - point1[2])), 3)
+            
             QMessageBox.information(self, "Z-Distance", f"Z-distance: {z_distance:.1f}")
 
             if self.last_drawn_line:
@@ -222,7 +220,6 @@ class LASViewer(QWidget):
         }
         """
         self.setStyleSheet(dark_qss)
-
 
     def load_selected_file(self, item):
         # Get the index of the selected item
@@ -281,6 +278,16 @@ class LASViewer(QWidget):
         # Highlight the current LAS file in the list
         self.las_file_list.setCurrentRow(self.current_index)
 
+    def copy_to_clipboard(self, text, description):
+        """
+        Copy the given text to the clipboard and show a confirmation message.
+        """
+        try:
+            pyperclip.copy(text)
+            QMessageBox.information(self, "Copied", f"{description} '{text}' copied to clipboard.")
+        except pyperclip.PyperclipException:
+            QMessageBox.critical(self, "Error", "Failed to copy to clipboard.")
+
     def copy_detection_id(self):
         """
         Copy the detection ID (extracted from the file name) to the clipboard.
@@ -288,8 +295,7 @@ class LASViewer(QWidget):
         file_name = self.las_data[self.current_index][0]
         try:
             detection_id = file_name.split("Detection_")[1].split(".las")[0]
-            pyperclip.copy(detection_id)
-            QMessageBox.information(self, "Copied", f"Detection ID '{detection_id}' copied to clipboard.")
+            self.copy_to_clipboard(detection_id, "Detection ID")
         except IndexError:
             QMessageBox.warning(self, "Error", "Could not extract Detection ID from the file name.")
 
@@ -307,8 +313,7 @@ class LASViewer(QWidget):
         else:
             coordinates = "No points available."
 
-        pyperclip.copy(coordinates)
-        QMessageBox.information(self, "Copied", f"Coordinates '{coordinates}' copied to clipboard.")
+        self.copy_to_clipboard(coordinates, "Coordinates")
 
     def next_las_file(self):
         """
