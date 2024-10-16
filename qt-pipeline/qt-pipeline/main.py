@@ -6,10 +6,11 @@ import pyperclip
 import pyvista as pv
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QPushButton, QLabel, QFileDialog,
-    QMessageBox, QHBoxLayout, QListWidget
+    QMessageBox, QHBoxLayout, QListWidget, QGridLayout
 )
 from PyQt5.QtCore import Qt
-from pyvistaqt import QtInteractor  # Ensure you have pyvistaqt installed
+from pyvistaqt import QtInteractor
+import webbrowser
 
 scaling_factor = 100000  # Scaling factor to adjust Z values for visualization
 
@@ -82,25 +83,21 @@ class CustomQtInteractor(QtInteractor):
         if event.button() != Qt.RightButton:
             super().mousePressEvent(event)
 
-
 class LASViewer(QWidget):
-    """
-    Main viewer for displaying and interacting with LAS files.
-    """
     def __init__(self):
         super().__init__()
         self.setWindowTitle("LAS Viewer")
         self.setGeometry(100, 100, 1200, 800)
 
-        self.layout = QVBoxLayout()
+        # Set the main layout to QGridLayout
+        self.layout = QGridLayout()
         self.setLayout(self.layout)
 
         # Set dark mode for the UI
         self.set_dark_mode()
 
-        # Top layout for buttons and label
+        # Top layout for buttons and label (row 0, spanning 2 columns)
         top_layout = QHBoxLayout()
-        self.layout.addLayout(top_layout)
 
         self.label = QLabel("No file loaded")
         top_layout.addWidget(self.label)
@@ -123,33 +120,32 @@ class LASViewer(QWidget):
         self.copy_coords_button.clicked.connect(self.copy_coordinates)
         top_layout.addWidget(self.copy_coords_button)
 
-        # Create a horizontal layout for the file list and the plotter
-        side_layout = QHBoxLayout()
-        self.layout.addLayout(side_layout)
+        # Add top layout to the first row of the grid layout, spanning two columns
+        self.layout.addLayout(top_layout, 0, 0, 1, 2)
 
-        # Add a QListWidget to display LAS files
+        # Create a grid layout for the file list and the plotter (row 1, two columns)
         self.las_file_list = QListWidget()
-        self.las_file_list.setFixedWidth(250)  # Set the fixed width for the list
+        self.las_file_list.setFixedWidth(150)
         self.las_file_list.setStyleSheet("""
             QListWidget {
-                background-color: #1e1e1e;  /* Dark background for the list */
-                color: #ffffff;              /* White text color */
+                background-color: #1e1e1e;  
+                color: #ffffff;
             }
             QListWidget::item:selected {
-                background-color: blue;      /* Blue background for selected item */
-                color: #ffffff;              /* White text color for selected item */
+                background-color: blue;
+                color: #ffffff;
             }
-        """)  # Set the highlight color to blue
-        self.las_file_list.itemClicked.connect(self.load_selected_file)  # Connect the click signal
-        side_layout.addWidget(self.las_file_list)
+        """)
+        self.las_file_list.itemClicked.connect(self.load_selected_file)
+        self.layout.addWidget(self.las_file_list, 1, 0)
 
-        # PyVista QtInteractor
+        # PyVista QtInteractor in the second column (right)
         self.plotter = QtInteractor(self)
-        side_layout.addWidget(self.plotter.interactor)
-        
+        self.layout.addWidget(self.plotter.interactor, 1, 1)
+
         # Use the custom interactor to disable right-click
         self.plotter = CustomQtInteractor(self)
-        self.layout.addWidget(self.plotter.interactor)
+        self.layout.addWidget(self.plotter.interactor, 1, 1)
 
         self.plotter.enable_point_picking(
                 callback=self.on_point_picked,
@@ -165,9 +161,9 @@ class LASViewer(QWidget):
         self.folder_path = ''
         self.las_data = []
         self.current_index = 0
-        self.selected_points = []  # Store selected points for distance calculations
-        self.last_drawn_line = None  # Store the last drawn line
-        self.point_picking_enabled = False  # Track whether point picking is enabled
+        self.selected_points = []
+        self.last_drawn_line = None
+        self.point_picking_enabled = False
 
         # Key event handling
         self.plotter.add_key_event("Right", self.next_las_file)
@@ -176,7 +172,7 @@ class LASViewer(QWidget):
         self.plotter.add_key_event("c", self.copy_coordinates)
         self.plotter.add_key_event("r", self.confirm_reset_program)
         self.plotter.add_key_event("l", self.confirm_close_program)
-        
+
         # Load LAS files
         self.select_folder_and_load()
 
