@@ -19,7 +19,7 @@ def load_las_file(file_path):
 
     Args:
         file_path (str): Path to the .las file.
-    
+
     Returns:
         tuple: A PyVista PolyData object and a boolean indicating if RGB colors are available.
     """
@@ -42,7 +42,14 @@ def load_las_file(file_path):
         if hasattr(las_file, 'red') and hasattr(las_file, 'green') and hasattr(las_file, 'blue'):
             colors = np.vstack((las_file.red, las_file.green, las_file.blue)).transpose()
             colors = colors / 255.0  # Normalize to range [0, 1]
-            point_cloud['Colors'] = colors
+
+            # Normalize colors to a new gradient range [0.2, 0.8]
+            min_val = colors.min(axis=0)
+            max_val = colors.max(axis=0)
+            normalized_colors = (colors - min_val) / (max_val - min_val)
+            adjusted_colors = 0.2 + normalized_colors * 0.6  # Scale to [0.2, 0.8]
+
+            point_cloud['Colors'] = adjusted_colors
             return point_cloud, True
         else:
             point_cloud['Elevation'] = points[:, 2]
@@ -59,7 +66,7 @@ def load_las_files_from_folder(folder_path):
 
     Args:
         folder_path (str): Path to the folder containing .las files.
-    
+
     Returns:
         list: A list of tuples containing the file name and its corresponding PolyData.
     """
@@ -115,10 +122,6 @@ class LASViewer(QWidget):
         self.copy_coords_button = QPushButton("Copy Coordinates")
         self.copy_coords_button.clicked.connect(self.copy_coordinates)
         top_layout.addWidget(self.copy_coords_button)
-        
-        self.point_selection_button = QPushButton("Enter Point Selection Mode")
-        self.point_selection_button.clicked.connect(self.toggle_point_picking)
-        top_layout.addWidget(self.point_selection_button)
 
         # Create a horizontal layout for the file list and the plotter
         side_layout = QHBoxLayout()
@@ -148,6 +151,15 @@ class LASViewer(QWidget):
         self.plotter = CustomQtInteractor(self)
         self.layout.addWidget(self.plotter.interactor)
 
+        self.plotter.enable_point_picking(
+                callback=self.on_point_picked,
+                tolerance=0.025,
+                show_message=False,
+                color='pink',
+                point_size=10,
+                show_point=True,
+                picker='point'
+        )
 
         # Initialize variables
         self.folder_path = ''
@@ -164,35 +176,9 @@ class LASViewer(QWidget):
         self.plotter.add_key_event("c", self.copy_coordinates)
         self.plotter.add_key_event("r", self.confirm_reset_program)
         self.plotter.add_key_event("l", self.confirm_close_program)
-        self.plotter.add_key_event("n", self.axis_reset)
-        self.plotter.add_key_event("z", self.toggle_point_picking)
-
         
         # Load LAS files
         self.select_folder_and_load()
-    
-    def toggle_point_picking(self):
-        """
-        Toggle point picking mode to allow users to select points for distance measurement.
-        """
-        if self.point_picking_enabled:
-            self.plotter.disable_picking()
-            self.point_picking_enabled = False
-            if self.last_drawn_line:
-                self.plotter.remove_actor(self.last_drawn_line)
-            self.selected_points.clear()
-        else:
-            self.plotter.enable_point_picking(
-                callback=self.on_point_picked,
-                tolerance=0.025,
-                show_message="POINT SELECTION MODE ACTIVATED",
-                font_size=12,
-                color='purple',
-                point_size=20,
-                show_point=True,
-            )
-            self.point_picking_enabled = True
-        self.plotter.render()
 
     def on_point_picked(self, picked_point, picker=None):
         """
@@ -211,9 +197,8 @@ class LASViewer(QWidget):
 
             line = pv.Line(point1, point2)
             self.last_drawn_line = self.plotter.add_mesh(line, color='red', line_width=3, pickable=False)
-            self.plotter.render()
-
             self.selected_points.clear()
+            self.plotter.render()
 
     def set_dark_mode(self):
         """
@@ -279,7 +264,7 @@ class LASViewer(QWidget):
         Update the visual plot with the current LAS file's data.
         """
         self.plotter.clear()
-        self.plotter.set_background('#2e2e2e')
+        self.plotter.set_background('#000000')
 
         file_name, (point_cloud, has_rgb) = self.las_data[self.current_index]
 
