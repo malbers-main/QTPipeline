@@ -13,7 +13,6 @@ from pyvistaqt import QtInteractor
 
 SCALING_FACTOR = 100000  # Scaling factor to adjust Z values for visualization
 
-
 def load_las_file(file_path):
     try:
         las_file = laspy.read(file_path)
@@ -46,17 +45,14 @@ def load_las_file(file_path):
         print(f"Error loading {file_path}: {e}")
         return None, False
 
-
 def load_las_files_from_folder(folder_path):
     las_files = [os.path.join(folder_path, f) for f in os.listdir(folder_path) if f.endswith('.las')]
     return [(file, result) for file in las_files if (result := load_las_file(file))[0] is not None]
-
 
 class CustomQtInteractor(QtInteractor):
     def mousePressEvent(self, event):
         if event.button() != Qt.RightButton:
             super().mousePressEvent(event)
-
 
 class LASViewer(QWidget):
     def __init__(self):
@@ -69,9 +65,14 @@ class LASViewer(QWidget):
 
         # Top Layout
         top_layout = QHBoxLayout()
+        self.select_folder_button = QPushButton("Select Folder")
+        self.select_folder_button.clicked.connect(self.select_folder_and_load)
+        top_layout.addWidget(self.select_folder_button)
+
         self.label = QLabel("")
         top_layout.addWidget(self.label)
         top_layout.addStretch()
+
         for text, handler in [
             ("Clear All", self.clear_all_files),
             ("Previous", self.previous_las_file),
@@ -82,6 +83,7 @@ class LASViewer(QWidget):
             button = QPushButton(text)
             button.clicked.connect(handler)
             top_layout.addWidget(button)
+
         self.layout.addLayout(top_layout, 0, 0, 1, 2)
 
         # LAS File List
@@ -116,8 +118,6 @@ class LASViewer(QWidget):
         ]:
             self.plotter.add_key_event(key, handler)
 
-        self.select_folder_and_load()
-
     def set_dark_mode(self):
         self.setStyleSheet("""
         QWidget { background-color: #121212; color: #ffffff; }
@@ -130,14 +130,14 @@ class LASViewer(QWidget):
         folder = QFileDialog.getExistingDirectory(self, "Select Folder Containing LAS Files")
         if not folder:
             QMessageBox.warning(self, "No Folder Selected", "Please select a folder to proceed.")
-            sys.exit()
+            return
 
         self.folder_path = folder
         self.las_data = load_las_files_from_folder(self.folder_path)
 
         if not self.las_data:
             QMessageBox.critical(self, "No LAS Files", "No valid LAS files found in the selected folder.")
-            sys.exit()
+            return
 
         self.las_file_list.clear()
         for file_name, _ in self.las_data:
@@ -191,18 +191,32 @@ class LASViewer(QWidget):
             QMessageBox.critical(self, "Error", "Failed to copy to clipboard.")
 
     def copy_detection_id(self):
-        file_name = self.las_data[self.las_file_list.currentRow()][0]
+        if not self.las_data or self.las_file_list.currentRow() == -1:
+            QMessageBox.warning(self, "No File Selected", "Please select a LAS file to copy its Detection ID.")
+            return
+
         try:
+            file_name = self.las_data[self.las_file_list.currentRow()][0]
             detection_id = file_name.split("Detection_")[1].split(".las")[0]
             self.copy_to_clipboard(detection_id, "Detection ID")
-        except IndexError:
+        except (IndexError, AttributeError):
             QMessageBox.warning(self, "Error", "Could not extract Detection ID from the file name.")
 
     def copy_coordinates(self):
-        _, (point_cloud, _) = self.las_data[self.las_file_list.currentRow()]
-        points = point_cloud.points
-        coordinates = f"{np.mean(points[:, 1]):.6f}, {np.mean(points[:, 0]):.6f}" if points.size > 0 else "No points available."
-        self.copy_to_clipboard(coordinates, "Coordinates")
+        if not self.las_data or self.las_file_list.currentRow() == -1:
+            QMessageBox.warning(self, "No File Selected", "Please select a LAS file to copy its coordinates.")
+            return
+
+        try:
+            _, (point_cloud, _) = self.las_data[self.las_file_list.currentRow()]
+            points = point_cloud.points
+            if points.size > 0:
+                coordinates = f"{np.mean(points[:, 1]):.6f}, {np.mean(points[:, 0]):.6f}"
+            else:
+                coordinates = "No points available."
+            self.copy_to_clipboard(coordinates, "Coordinates")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to copy coordinates: {e}")
 
     def next_las_file(self):
         self._navigate_las_files(1, "last")
@@ -248,7 +262,6 @@ def main():
     viewer = LASViewer()
     viewer.show()
     sys.exit(app.exec_())
-
 
 if __name__ == "__main__":
     main()
