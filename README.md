@@ -11,57 +11,15 @@ This project is a LAS Viewer that allows users to load, visualize, and interact 
 - Measure Z-distance between selected points in the point cloud.
 - Dark mode user interface.
 
-## Requirements
+## Installation + Executable Creation
 
-python -m pip install PyQt5 PyVista pyvistaqt laspy pyperclip numpy
-
-## Installation
-
-1. Clone this repository:
-   ```sh
-   git clone <repository_url>
+   gh repo clone malbers-main/QTPipeline
    cd <repository_folder>
-   ```
-
-2. Create a virtual environment (recommended):
-   ```sh
    python -m venv venv
-   ```
-
-3. Activate the virtual environment:
-   - On Windows:
-     venv\Scripts\activate
-
-   - On macOS/Linux:
-     source venv/bin/activate
-
-4. Install the required packages:
-   pip install -r requirements.txt
-
-
-## Running the Application
-
-To run the LAS Viewer, execute the following command in your terminal:
-python las_viewer.py
-
-## Creating an Executable on Windows
-
-If you want to create a standalone executable that can run without requiring Python to be installed, you can use the `PyInstaller` package.
-
-### Step-by-Step Instructions
-
-1. Ensure the virtual environment is activated.
-
-2. Install PyInstaller:
+   source venv/Scripts/activate
+   pip install numpy laspy pyperclip pyvista pyvistaqt PyQt5
    pip install pyinstaller
-
-3. Run the following command to create an executable:
    pyinstaller --onefile --windowed las_viewer.py
-
-   - `--onefile`: Packages everything into a single executable.
-   - `--windowed`: Ensures no console window appears when running the application.
-
-4. After running the command, the executable will be available in the `dist` folder.
 
 ### Notes:
 - Ensure all dependencies are installed in the virtual environment before running PyInstaller.
