@@ -1,127 +1,103 @@
-﻿LAS Viewer README
-Overview
+﻿# LAS Viewer
 
-The LAS Viewer is a Python-based graphical user interface (GUI) application that enables users to load, visualize, and interact with LAS point cloud files. The tool offers functionality for viewing, measuring, and managing multiple LAS files in an intuitive way using PyVista and PyQt5. This README covers how to set up, use, and extend the program.
-Features
+This project is a LAS Viewer that allows users to load, visualize, and interact with point cloud data from `.las` files using a graphical interface built with PyQt5 and PyVista.
 
-    Load and visualize multiple LAS files from a selected folder.
-    Dark mode interface for comfortable viewing.
-    Point picking with Z-distance measurement between two points.
-    RGB color support for point clouds with color attributes.
-    Coordinate and Detection ID extraction with clipboard copy functionality.
-    Navigation buttons (Previous/Next) to move through LAS files.
-    Restart option to select a new folder of LAS files.
-    Keyboard shortcuts for navigation and functionality:
-        Arrow Right: Next LAS file.
-        Arrow Left: Previous LAS file.
-        d: Copy detection ID.
-        c: Copy coordinates.
-        r: Restart program.
-        p: Pick two points and find the z-distance between them
+## Features
 
-Prerequisites
+- Load and visualize `.las` files containing point cloud data.
+- View RGB-colored point clouds or visualize using elevation data.
+- Select and toggle visibility of multiple LAS files.
+- Copy detection IDs and coordinates of selected points.
+- Measure Z-distance between selected points in the point cloud.
+- Dark mode user interface.
 
-Ensure the following dependencies are installed:
+## Requirements
 
-    Python 3.8+
-    PyQt5
-    PyVista and pyvistaqt
-    laspy
-    numpy
-    pyperclip
+- Python 3.8+
+- PyQt5
+- PyVista
+- PyVistaQt
+- laspy
+- pyperclip
+- NumPy
 
-To install them, run:
+## Installation
 
-bash
+1. Clone this repository:
+   ```sh
+   git clone <repository_url>
+   cd <repository_folder>
+   ```
 
-pip install PyQt5 pyvista pyvistaqt laspy numpy pyperclip
+2. Create a virtual environment (recommended):
+   ```sh
+   python -m venv venv
+   ```
 
-Installation
+3. Activate the virtual environment:
+   - On Windows:
+     venv\Scripts\activate
 
-    Clone or download the project repository.
+   - On macOS/Linux:
+     source venv/bin/activate
 
-    Ensure the dependencies listed above are installed.
+4. Install the required packages:
+   pip install -r requirements.txt
 
-    Navigate to the project directory and run the program:
 
-    bash
+## Running the Application
 
-    python main.py
+To run the LAS Viewer, execute the following command in your terminal:
+python las_viewer.py
 
-Usage
-1. Launch the Application
+## Creating an Executable on Windows
 
-Run the program using:
+If you want to create a standalone executable that can run without requiring Python to be installed, you can use the `PyInstaller` package.
 
-bash
+### Step-by-Step Instructions
 
-python main.py
+1. Ensure the virtual environment is activated.
 
-2. Select Folder
+2. Install PyInstaller:
+   pip install pyinstaller
 
-Upon startup, you’ll be prompted to select a folder containing LAS files. If no folder is selected, the application will exit.
-3. Navigation & Controls
+3. Run the following command to create an executable:
+   pyinstaller --onefile --windowed las_viewer.py
 
-    Use Previous/Next buttons to switch between LAS files.
-    Select files from the list on the left to visualize them in the viewer.
-    Keyboard shortcuts allow quick access to key functionality.
+   - `--onefile`: Packages everything into a single executable.
+   - `--windowed`: Ensures no console window appears when running the application.
 
-4. Point Picking
+4. After running the command, the executable will be available in the `dist` folder.
 
-    Press p to enable point picking.
-    Pick two points to measure the Z-distance. The result will be displayed in a popup.
+### Notes:
+- Ensure all dependencies are installed in the virtual environment before running PyInstaller.
+- The executable may take a while to generate, and the first run may also take a little longer.
 
-5. Copy Detection ID and Coordinates
+## Usage
 
-    Select a file and click Copy Detection ID to extract and copy the ID from the file name.
-    Click Copy Coordinates to copy the central coordinates of the point cloud to the clipboard.
+1. Launch the application.
+2. Use the "Select Folder" button to select a folder containing `.las` files.
+3. View and interact with the point clouds in the viewer area.
+4. Use various buttons and keyboard shortcuts for navigation and interaction.
 
-Folder Structure
+## Keyboard Shortcuts
 
-    main.py: The main application script.
-    /assets: (Optional) Store additional resources like icons or themes here.
-    README.md: Documentation for the project.
+- `Right Arrow`: Load the next LAS file.
+- `Left Arrow`: Load the previous LAS file.
+- `d`: Copy detection ID.
+- `c`: Copy coordinates.
+- `r`: Restart and select a new folder.
+- `p`: Select two points and find the height difference between them in meters.
 
-Error Handling
-
-    If no valid LAS files are found in the selected folder, the application will display an error and exit.
-    File selection errors or clipboard copy failures are managed with warning and error dialogs.
-
-Customization
-Dark Mode Styling
-
-Modify the dark mode styles by changing the set_dark_mode() function in LASViewer.
-Scaling Factor
-
-Change the scaling_factor variable at the top of the script to adjust the Z-axis scaling for visualization.
-Troubleshooting
-
-    VTK error on Windows: Ensure the correct VTK version is installed using:
-
-    bash
-
-pip install vtk
-
-Qt compatibility issues: If there are PyQt5-related errors, try:
-
-bash
-
-    pip install PyQt5==5.15.4
-
-License
+## License
 
 This project is licensed under the MIT License.
-Acknowledgments
 
-    PyVista: For 3D visualization support.
-    PyQt5: For the GUI framework.
-    laspy: For handling LAS file reading and processing.
+## Acknowledgments
 
-Contributing
+- Developed using PyQt5 and PyVista for a smooth visualization experience.
 
-Contributions are welcome! Feel free to submit pull requests or report issues on the project repository.
-Contact
+## Issues
 
-For any questions or issues, contact the developer or open an issue on the project repository.
+If you encounter any issues or have questions, please create an issue in the GitHub repository.
 
-Happy Visualizing! 🚀
