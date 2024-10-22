@@ -9,6 +9,7 @@ from PyQt5.QtWidgets import (
     QMessageBox, QHBoxLayout, QListWidget, QGridLayout, QListWidgetItem
 )
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QMouseEvent
 from pyvistaqt import QtInteractor
 
 SCALING_FACTOR = 100000  # Scaling factor to adjust Z values for visualization
@@ -49,10 +50,13 @@ def load_las_files_from_folder(folder_path):
     las_files = [os.path.join(folder_path, f) for f in os.listdir(folder_path) if f.endswith('.las')]
     return [(file, result) for file in las_files if (result := load_las_file(file))[0] is not None]
 
+# Disables right-click functionality (point picking / zooming) and replaces it with the middle click usage
 class CustomQtInteractor(QtInteractor):
     def mousePressEvent(self, event):
-        if event.button() != Qt.RightButton:
-            super().mousePressEvent(event)
+        if event.button() == Qt.RightButton:
+            event = QMouseEvent(event.type(), event.localPos(), event.screenPos(), event.windowPos(),
+                                Qt.MiddleButton, event.buttons() | Qt.MiddleButton, event.modifiers())
+        super().mousePressEvent(event)
 
 class LASViewer(QWidget):
     def __init__(self):
