@@ -13,13 +13,7 @@ This project is a LAS Viewer that allows users to load, visualize, and interact 
 
 ## Requirements
 
-- Python 3.8+
-- PyQt5
-- PyVista
-- PyVistaQt
-- laspy
-- pyperclip
-- NumPy
+python -m pip install PyQt5 PyVista pyvistaqt laspy pyperclip numpy
 
 ## Installation
 
