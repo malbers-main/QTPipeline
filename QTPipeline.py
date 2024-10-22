@@ -45,9 +45,12 @@ def load_las_file(file_path):
     except Exception as e:
         print(f"Error loading {file_path}: {e}")
         return None, False
-
-def load_las_files_from_folder(folder_path):
+    
+def load_las_files_from_folder(self, folder_path):
     las_files = [os.path.join(folder_path, f) for f in os.listdir(folder_path) if f.endswith('.las')]
+    if len(las_files) > 100:
+        QMessageBox.critical(self, "Too Many Files", "The selected folder contains more than 100 LAS files. Please select a folder with fewer files.")
+        return None
     return [(file, result) for file in las_files if (result := load_las_file(file))[0] is not None]
 
 # Disables right-click functionality (point picking / zooming) and replaces it with the middle click usage
@@ -137,7 +140,10 @@ class LASViewer(QWidget):
             return
 
         self.folder_path = folder
-        self.las_data = load_las_files_from_folder(self.folder_path)
+        self.las_data = load_las_files_from_folder(self, self.folder_path)
+        
+        if self.las_data is None:
+            return
 
         if not self.las_data:
             QMessageBox.critical(self, "No LAS Files", "No valid LAS files found in the selected folder.")
@@ -265,6 +271,7 @@ def main():
     app = QApplication(sys.argv)
     viewer = LASViewer()
     viewer.show()
+    viewer.clear_all_files()
     sys.exit(app.exec_())
 
 if __name__ == "__main__":
