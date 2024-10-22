@@ -13,13 +13,13 @@ This project is a LAS Viewer that allows users to load, visualize, and interact 
 
 ## Installation + Executable Creation
 
-   gh repo clone malbers-main/QTPipeline
-   cd <repository_folder>
-   python -m venv venv
-   source venv/Scripts/activate
-   pip install numpy laspy pyperclip pyvista pyvistaqt PyQt5
-   pip install pyinstaller
-   pyinstaller --onefile --windowed las_viewer.py
+   - gh repo clone malbers-main/QTPipeline
+   - cd QTPipeline
+   - python -m venv venv
+   - source venv/Scripts/activate
+   - pip install numpy laspy pyperclip pyvista pyvistaqt PyQt5
+   - pip install pyinstaller
+   - pyinstaller --onefile --windowed las_viewer.py
 
 ### Notes:
 - Ensure all dependencies are installed in the virtual environment before running PyInstaller.
